@@ -1084,6 +1084,24 @@ static void comm_in(int fd, short mask, void *data) {
 	}
 }
 
+static void reload_background() {
+	struct swaylock_image *image;
+	wl_list_for_each(image, &state.images, link) {
+		cairo_surface_t *cairo_surface = load_background_image(image->path);
+		if (cairo_surface) {
+			cairo_surface_destroy(image->cairo_surface);
+			image->cairo_surface = cairo_surface;
+		}
+	}
+	struct swaylock_surface *surface;
+	wl_list_for_each(surface, &state.surfaces, link) {
+		surface->last_buffer_width = 0; // force re-render
+		surface->image = select_image(&state, surface);
+		render_frame_background(surface);
+		render_frame(surface);
+	}
+}
+
 static void term_in(int fd, short mask, void *data) {
 	state.run_display = false;
 }
