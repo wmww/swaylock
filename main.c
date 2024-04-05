@@ -1106,6 +1106,19 @@ static void term_in(int fd, short mask, void *data) {
 	state.run_display = false;
 }
 
+static void pipe_in(int fd, short mask, void *data) {
+	char result = 0;
+	if (read(fd, &result, sizeof(result)) != sizeof(result)) {
+		swaylock_log_errno(LOG_ERROR, "Failed to read result from pipe");
+		result = 0;
+	}
+	switch (result) {
+		case 'u': state.run_display = false; break;
+		case 'r': reload_background(); break;
+		default:;
+	}
+}
+
 // Check for --debug 'early' we also apply the correct loglevel
 // to the forked child, without having to first proces all of the
 // configuration (including from file) before forking and (in the
@@ -1294,6 +1307,19 @@ int main(int argc, char **argv) {
 	loop_add_fd(state.eventloop, get_comm_reply_fd(), POLLIN, comm_in, NULL);
 
 	loop_add_fd(state.eventloop, sigusr_fds[0], POLLIN, term_in, NULL);
+
+	int pipe_fd;
+	static const char* pipe_path = "/tmp/swaylock_pipe";
+	remove(pipe_path);
+	if (mkfifo(pipe_path, 0666) == -1) {
+		perror("mkfifo error");
+		exit(1);
+	}
+	if ((pipe_fd = open(pipe_path, O_RDWR | O_NONBLOCK)) == -1) {
+		perror("open error");
+		exit(1);
+	}
+	loop_add_fd(state.eventloop, pipe_fd, POLLIN, pipe_in, NULL);
 
 	struct sigaction sa;
 	sa.sa_handler = do_sigusr;
