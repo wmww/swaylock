@@ -1115,6 +1115,18 @@ static void pipe_in(int fd, short mask, void *data) {
 	switch (result) {
 		case 'u': state.run_display = false; break;
 		case 'r': reload_background(); break;
+		case 'n':
+			if (state.input_state != INPUT_STATE_LETTER) {
+				state.input_state = INPUT_STATE_LETTER;
+				state.highlight_start = -512;
+			} else {
+				state.highlight_start += 512;
+			}
+			struct swaylock_surface *surface;
+			wl_list_for_each(surface, &state.surfaces, link) {
+				render_frame(surface);
+			}
+			break;
 		default:;
 	}
 }
