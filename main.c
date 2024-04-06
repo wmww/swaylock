@@ -1106,6 +1106,34 @@ static void term_in(int fd, short mask, void *data) {
 	state.run_display = false;
 }
 
+static char* read_from_fd(int fd) {
+	size_t chunk_size = 256;
+	size_t cap = chunk_size;
+	char* buf = malloc(cap);
+	char* end = buf;
+	while (true) {
+		int result = read(fd, end, buf + cap - end - 1);
+		if (result > 0) {
+			end += result;
+		} else if (result == 0 || errno == EAGAIN) {
+			break;
+		} else if (result < 0) {
+			perror("Failed to read from pipe");
+			break;
+		}
+		if (end >= buf + cap - 1) {
+			size_t new_cap = cap + chunk_size;
+			char* new_buf = malloc(new_cap);
+			memcpy(new_buf, buf, end - buf);
+			free(buf);
+			buf = new_buf;
+			cap = new_cap;
+		}
+	}
+	*end = '\0';
+	return buf;
+}
+
 static void pipe_in(int fd, short mask, void *data) {
 	char result = 0;
 	if (read(fd, &result, sizeof(result)) != sizeof(result)) {
@@ -1114,7 +1142,18 @@ static void pipe_in(int fd, short mask, void *data) {
 	}
 	switch (result) {
 		case 'u': state.run_display = false; break;
-		case 'r': reload_background(); break;
+
+		case 'b': {
+			char* path = read_from_fd(fd);
+			struct swaylock_image *image;
+			wl_list_for_each(image, &state.images, link) {
+				free(image->path);
+				image->path = strdup(path);
+			}
+			free(path);
+			reload_background();
+		}	break;
+
 		case 'n':
 			if (state.input_state != INPUT_STATE_LETTER) {
 				state.input_state = INPUT_STATE_LETTER;
