@@ -1070,8 +1070,8 @@ static void reload_background() {
 	wl_list_for_each(surface, &state.surfaces, link) {
 		surface->last_buffer_width = 0; // force re-render
 		surface->image = select_image(&state, surface);
-		render_frame_background(surface);
-		render_frame(surface);
+		surface->dirty = true;
+		render(surface);
 	}
 }
 
@@ -1136,7 +1136,8 @@ static void pipe_in(int fd, short mask, void *data) {
 			}
 			struct swaylock_surface *surface;
 			wl_list_for_each(surface, &state.surfaces, link) {
-				render_frame(surface);
+				surface->dirty = true;
+				render(surface);
 			}
 			break;
 		default:;
